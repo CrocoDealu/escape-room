@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Escape Room</title>
+<style>
+  :root { --bg:#1a1020; --card:#2a1a33; --text:#fbeff5; --muted:#c9a9bd; --accent:#ff5c8a; --ok:#6be3a4; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; background:radial-gradient(circle at 50% 0,#3a1d3f,var(--bg) 70%); color:var(--text);
+         font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; display:grid; place-items:center; padding:16px; }
+  .card { background:var(--card); border-radius:24px; padding:40px; max-width:720px; width:100%; text-align:center; box-shadow:0 20px 60px #0008; }
+  h1 { font-size:2.6rem; margin:0 0 16px; } h2 { font-size:1.8rem; margin:12px 0 24px; }
+  p { font-size:1.25rem; line-height:1.6; color:var(--muted); } .small { font-size:1rem; }
+  input { font-size:1.5rem; padding:14px 18px; border-radius:14px; border:2px solid #fff3; background:#0003; color:var(--text);
+          width:100%; max-width:420px; text-align:center; outline:none; } input:focus { border-color:var(--accent); }
+  button { font-size:1.3rem; padding:14px 32px; border:0; border-radius:14px; background:var(--accent); color:#fff; cursor:pointer; margin-top:16px; }
+  button.ghost { background:none; border:2px solid #fff3; font-size:1rem; padding:8px 18px; }
+  .msg { min-height:1.6em; margin-top:12px; color:var(--accent); }
+  .hint { color:var(--text); }
+  .boxes { display:flex; gap:8px; justify-content:center; margin:24px 0; }
+  .box { width:44px; height:54px; border-radius:10px; background:#0004; border:2px solid #fff2; display:grid; place-items:center; font-size:1.6rem; font-weight:700; color:var(--ok); }
+  .shake { animation:shake .4s; } @keyframes shake { 25%{transform:translateX(-10px)} 75%{transform:translateX(10px)} }
+  #clock { position:fixed; top:16px; right:20px; font-size:1.4rem; font-variant-numeric:tabular-nums; color:var(--muted); }
+  #clock.over { color:var(--accent); }
+
+  /* imaginea împărțită: laptopul arată stânga, telefonul dreapta */
+  .half { --w:min(70vw,360px); width:var(--w); aspect-ratio:1; overflow:hidden; border-radius:16px; margin:0 auto 24px; }
+  .full { width:200%; height:100%; display:grid; place-items:center; font-weight:900; font-size:calc(var(--w)*.42); letter-spacing:.05em;
+          color:#fff; -webkit-text-stroke:3px #000; text-shadow:0 0 30px #000;
+          background:url(poza.jpg) center/cover, linear-gradient(135deg,#ff5c8a,#7a3cff); }
+  .right .full { margin-left:-100%; }
+
+  /* tort */
+  .cake { position:relative; width:260px; height:220px; margin:40px auto 16px; }
+  .layer { position:absolute; left:0; right:0; bottom:0; height:110px; border-radius:16px; background:linear-gradient(#ffb3c8,#ff7aa2); }
+  .layer.top { bottom:110px; left:30px; right:30px; height:60px; background:linear-gradient(#fff,#ffd6e2); }
+  .candles { position:absolute; bottom:170px; left:40px; right:40px; display:flex; justify-content:space-around; }
+  .candle { width:14px; height:50px; background:repeating-linear-gradient(45deg,#fff 0 6px,#7ab8ff 6px 12px); border-radius:3px; position:relative; cursor:pointer; }
+  .candle::after { content:""; position:absolute; left:50%; top:-26px; width:16px; height:24px; transform:translateX(-50%);
+                   background:radial-gradient(#fff6a0,#ff9b2f 60%,transparent 70%); border-radius:50% 50% 50% 50%/60% 60% 40% 40%;
+                   animation:flick .15s infinite alternate; }
+  .candle.off::after { display:none; }
+  @keyframes flick { to { transform:translateX(-50%) scale(.9,1.08); } }
+  .meter { height:8px; max-width:260px; margin:0 auto; background:#0004; border-radius:4px; overflow:hidden; }
+  .meter div { height:100%; width:0; background:var(--ok); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ======================= TOT CE TREBUIE SĂ EDITEZI E AICI =======================
+const CONFIG = {
+  cod: '000',              // codul lacătului: cifra 1 = oglinda, cifra 2 = tortul, cifra 3 = dulapul
+  minute: 60,
+  pragSuflat: 0.15,        // ponytail: calibrare microfon — urcă dacă lumânările se sting singure, coboară dacă nu se sting deloc
+  parolaTort: 'dorință',   // apare pe telefon după ce stinge lumânările
+  cuvantImagine: 'DULAP',  // scris peste poză, jumătate pe laptop, jumătate pe telefon
+  // fiecare răspuns corect dezvăluie literele lui; împreună formează FRIGIDER
+  intrebari: [
+    { q: 'Unde ne-am cunoscut?',                 a: ['raspuns1'],            litere: 'FR' },
+    { q: 'Ce am mâncat la prima întâlnire?',     a: ['raspuns2', 'varianta'], litere: 'IG' },
+    { q: 'Cum îmi spui când ești supărată? 😏',  a: ['raspuns3'],            litere: 'ID' },
+    { q: 'În ce lună ne-am sărutat prima dată?', a: ['raspuns4'],            litere: 'ER' },
+  ],
+  mesajFinal: 'Te iubesc! ❤️ Scrie aici mesajul tău.',
+  indicii: { // butonul 💡 de pe laptop le arată pe rând, pentru pasul curent
+    1: ['Gândește-te la noi doi... 💭', 'Diacriticele nu contează.'],
+    2: ['Harta e pe ușa frigiderului. Cheia e înăuntru, la rece.', 'Pune foaia peste desen și aliniază punctele.',
+        'Un duș fierbinte... apoi privește-te în oglindă.', 'Capacul nu e doar la WC. Uită-te și la rezervor 😉',
+        'Scanează codul cu telefonul și pune-ți o dorință.'],
+    3: ['Cealaltă jumătate e pe telefonul tău.', 'Pune telefonul lângă laptop.'],
+    4: ['Umerașele din dulap au litere.', 'De la haina cea mai închisă la culoare la cea mai deschisă.',
+        'Ordinea cifrelor: oglinda, tortul, dulapul.'],
+  },
+};
+// ================================================================================
+
+const KEY = 'escape-room';
+const $ = s => document.querySelector(s);
+const app = $('#app');
+const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || { step: 0, q: 0, h: 0 }; } catch { return { step: 0, q: 0, h: 0 }; } };
+const save = s => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {} };
+const norm = v => v.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim().replace(/\s+/g, ' ');
+const match = (v, answers) => [].concat(answers).some(a => norm(a) === norm(v));
+const mmss = sec => `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
+const image = side => `<div class="half ${side}"><div class="full">${CONFIG.cuvantImagine}</div></div>`;
+console.assert(match('  Dorinţă ', 'dorință') && match('ȘTIU', 'stiu') && !match('dorinte', 'dorință'), 'norm() e stricat');
+
+const params = new URLSearchParams(location.search);
+if (params.has('reset')) { localStorage.removeItem(KEY); location.search = ''; }
+if (params.get('m') === 'tort') tort();
+else { laptop(); setInterval(clock, 1000); }
+
+// ---------------------------------- LAPTOP ----------------------------------
+function clock() {
+  const s = load(), el = $('#clock');
+  if (!s.startedAt || s.doneAt) return el.textContent = '';
+  const left = CONFIG.minute * 60 - Math.round((Date.now() - s.startedAt) / 1000);
+  el.textContent = left >= 0 ? mmss(left) : `+${mmss(-left)}`;
+  el.classList.toggle('over', left < 0);
+}
+
+function laptop() {
+  const s = load();
+  const n = CONFIG.intrebari.length;
+  const word = CONFIG.intrebari.map(x => x.litere).join('');
+  const shown = CONFIG.intrebari.slice(0, s.step > 1 ? n : s.q).map(x => x.litere).join('');
+  const boxes = `<div class="boxes">${[...word].map((c, i) => `<span class="box">${i < shown.length ? c : ''}</span>`).join('')}</div>`;
+  const form = (label, extra = '') => `<form><input id="in" placeholder="${label}" autocomplete="off" ${extra}><br><button>Verifică</button><div class="msg" id="msg"></div></form>`;
+  const hints = CONFIG.indicii[s.step] || [];
+  const hintBox = hints.length ? hints.slice(0, s.h).map(h => `<p class="hint">💡 ${h}</p>`).join('') +
+    (s.h < hints.length ? `<button class="ghost" id="hint">💡 Indiciu (${s.h}/${hints.length})</button>` : '') : '';
+
+  const screens = [
+    () => `<h1>Bună, iubito ❤️</h1>
+      <p>Vezi rucsacul? Acolo te așteaptă premiul. Se deschide doar cu un cod de 3 cifre — fără trișat 😏</p>
+      <p>Ai ${CONFIG.minute} de minute. Telefonul o să-ți fie de folos, și ține minte fiecare cifră pe care o găsești. Dacă te blochezi, apasă pe 💡.</p>
+      <button id="go">Începe</button>`,
+    () => `<p class="small">Întrebarea ${s.q + 1} din ${n}</p><h2>${CONFIG.intrebari[s.q].q}</h2>${boxes}${form('Răspunsul tău')}`,
+    () => `<h2>Bravo! 🎉</h2>${boxes}<p>Harta e afară. Cheia stă la rece.</p><p class="small">Când găsești parola secretă, scrie-o aici.</p>${form('Parola secretă')}`,
+    () => `<p>Jumătate de amintire e aici. Cealaltă jumătate e la tine.</p>${image('left')}${form('Unde mergi acum?')}`,
+    () => `<h2>Aproape gata!</h2><p>Umerașele au ceva de spus. Citește literele de la haina cea mai închisă la culoare la cea mai deschisă.</p>
+      <p class="small">Acum ai toate cele 3 cifre: oglinda, tortul, dulapul.</p>${form('Codul', 'inputmode="numeric" maxlength="3"')}`,
+    () => `<h1>Ai reușit! 🎉</h1><p>Timp: ${mmss(Math.round((s.doneAt - s.startedAt) / 1000))}</p>
+      <h2>Deschide rucsacul 🎒</h2><p>${CONFIG.mesajFinal}</p>`,
+  ];
+  const checks = [, v => match(v, CONFIG.intrebari[s.q].a), v => match(v, CONFIG.parolaTort), v => match(v, CONFIG.cuvantImagine), v => v.trim() === CONFIG.cod];
+
+  app.innerHTML = `<div id="clock"></div><div class="card">${screens[s.step]()}${hintBox}</div>`;
+  clock();
+  const next = () => { s.step++; s.h = 0; if (s.step === 5) s.doneAt = Date.now(); save(s); laptop(); };
+
+  $('#go')?.addEventListener('click', () => { s.startedAt = Date.now(); next(); });
+  $('#hint')?.addEventListener('click', () => { s.h++; save(s); laptop(); });
+  $('#in')?.focus();
+  $('form')?.addEventListener('submit', e => {
+    e.preventDefault();
+    const v = $('#in').value;
+    if (!checks[s.step](v)) {
+      const card = $('.card'); card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake');
+      $('#msg').textContent = 'Nu chiar... mai încearcă 😘';
+      return;
+    }
+    if (s.step === 1 && ++s.q < n) { save(s); return laptop(); }
+    next();
+  });
+}
+
+// ---------------------------------- TELEFON ----------------------------------
+function tort() {
+  app.innerHTML = `<div class="card"><h2>Pune-ți o dorință ✨</h2><p id="tip">Atinge butonul, apoi suflă în telefon.</p>
+    <div class="cake"><div class="candles">${'<div class="candle"></div>'.repeat(5)}</div><div class="layer top"></div><div class="layer"></div></div>
+    <div class="meter"><div id="lvl"></div></div><button id="go">Sunt gata</button><div id="win"></div></div>`;
+  const stinge = el => {
+    (el || $('.candle:not(.off)'))?.classList.add('off');
+    if (!$('.candle:not(.off)') && !$('#win').innerHTML) setTimeout(() => {
+      $('.cake').remove(); $('.meter').remove(); $('#tip').remove(); $('#go')?.remove();
+      $('#win').innerHTML = `<h2>Cifra 2: ${CONFIG.cod[1]}</h2><p>Spune-i laptopului: <b>${CONFIG.parolaTort.toUpperCase()}</b></p>
+        <p class="small">Și păstrează asta, o să ai nevoie de ea 👇</p>${image('right')}`;
+    }, 600);
+  };
+  document.querySelectorAll('.candle').forEach(c => c.addEventListener('click', () => stinge(c))); // rezervă dacă microfonul nu merge
+
+  $('#go').addEventListener('click', async () => {
+    $('#go').remove();
+    try {
+      const ctx = new AudioContext(); // creat înainte de await, altfel iOS îl lasă suspendat
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      await ctx.resume();
+      const an = ctx.createAnalyser(); an.fftSize = 1024;
+      ctx.createMediaStreamSource(stream).connect(an);
+      const buf = new Float32Array(an.fftSize);
+      let blow = 0;
+      $('#tip').textContent = 'Suflă! 🌬️';
+      const loop = () => {
+        an.getFloatTimeDomainData(buf);
+        const rms = Math.sqrt(buf.reduce((a, v) => a + v * v, 0) / buf.length);
+        $('#lvl').style.width = Math.min(100, rms / CONFIG.pragSuflat * 50) + '%'; // 50% = prag
+        if (rms > CONFIG.pragSuflat) { if (++blow > 12) { blow = 0; stinge(); } } else blow = Math.max(0, blow - 1);
+        if ($('.candle:not(.off)')) requestAnimationFrame(loop); else stream.getTracks().forEach(t => t.stop());
+      };
+      loop();
+    } catch {
+      $('#tip').textContent = 'Microfonul nu merge — atinge lumânările ca să le stingi.';
+    }
+  });
+}
+</script>
+</body>
+</html>
