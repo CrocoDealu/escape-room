@@ -53,7 +53,7 @@
 const CONFIG = {
   cod: '753',              // codul lacătului: cifra 1 = oglinda, cifra 2 = tortul, cifra 3 = dulapul
   minute: 60,
-  pragSuflat: 0.05,        // ponytail: calibrare microfon — urcă dacă lumânările se sting singure, coboară dacă nu se sting deloc
+  pragSuflat: +new URLSearchParams(location.search).get('prag') || 0.01, // calibrare microfon (test: ?m=tort&prag=0.03) — urcă dacă se sting singure, coboară dacă nu se sting deloc
   parolaTort: 'dorință',   // apare pe telefon după ce stinge lumânările
   cuvantImagine: 'DULAP',  // scris peste poză, jumătate pe laptop, jumătate pe telefon
   // fiecare răspuns corect dezvăluie literele lui; împreună formează FRIGIDER
