@@ -70,7 +70,7 @@ const CONFIG = {
         'Un duș fierbinte... apoi privește-te în oglindă.', 'Capacul nu e doar la WC. Uită-te și la rezervor 😉',
         'Biletul de sub capac îți spune ce să faci cu telefonul.'],
     3: ['Cealaltă jumătate e pe telefonul tău.', 'Pune telefonul lângă laptop.'],
-    4: ['Umerașele din dulap au litere.', 'De la haina cea mai închisă la culoare la cea mai deschisă.',
+    4: ['Umerașele din dulap au litere.', 'De la haina cea mai deschisă la culoare la cea mai închisă.',
         'Ordinea cifrelor: oglinda, tortul, dulapul.'],
   },
 };
@@ -120,7 +120,7 @@ function laptop() {
     () => `<p class="small">Întrebarea ${s.q + 1} din ${n}</p><h2>${CONFIG.intrebari[s.q].q}</h2>${boxes}${form('Răspunsul tău')}`,
     () => `<h2>Bravo! 🎉</h2>${boxes}<p>Harta e afară. Cheia stă la rece.</p><p class="small">Când găsești parola secretă, scrie-o aici.</p>${form('Parola secretă')}`,
     () => `<p>Jumătate de amintire e aici. Cealaltă jumătate e la tine.</p>${image('left')}${form('Unde mergi acum?')}`,
-    () => `<h2>Aproape gata!</h2><p>Umerașele au ceva de spus. Citește literele de la haina cea mai închisă la culoare la cea mai deschisă.</p>
+    () => `<h2>Aproape gata!</h2><p>Umerașele au ceva de spus. Citește literele de la haina cea mai deschisă la culoare la cea mai închisă.</p>
       <p class="small">Acum ai toate cele 3 cifre: oglinda, tortul, dulapul.</p>${form('Codul', 'inputmode="numeric" maxlength="3"')}`,
     () => `<h1>Ai reușit! 🎉</h1><p>Timp: ${mmss(Math.round((s.doneAt - s.startedAt) / 1000))}</p>
       <h2>Deschide rucsacul 🎒</h2><p>${CONFIG.mesajFinal}</p>`,
